@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bazooka - عجلة الجوائز</title>
+  <style>
+    body {
+      font-family: 'Cairo', sans-serif;
+      background: linear-gradient(135deg, #ff4b2b, #ff416c);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.2rem;
+      margin-bottom: 10px;
+    }
+    button {
+      background-color: #fff;
+      color: #ff416c;
+      font-size: 1.2rem;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 25px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background-color: #ffefef;
+    }
+    .result {
+      margin-top: 20px;
+      font-size: 1.4rem;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎡 Bazooka - عجلة الجوائز</h1>
+  <p>اضغط على الزر لتجربة سحب عشوائي من الجوائز!</p>
+  <button id="spinButton">لف العجلة</button>
+  <div class="result" id="resultText"></div>
+
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCSv2mQKWJznZ1aC-YBpsbmlcZcbQamzY4",
+      authDomain: "bazooka-950e9.firebaseapp.com",
+      databaseURL: "https://bazooka-950e9-default-rtdb.firebaseio.com",
+      projectId: "bazooka-950e9",
+      storageBucket: "bazooka-950e9.appspot.com",
+      messagingSenderId: "53284970189",
+      appId: "1:53284970189:web:4e8f3bd1825e2240425384",
+      measurementId: "G-CKYK8KFGY2"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const spinButton = document.getElementById("spinButton");
+    const resultText = document.getElementById("resultText");
+
+    spinButton.addEventListener("click", async () => {
+      resultText.textContent = "جاري السحب...";
+      try {
+        const snapshot = await get(child(ref(db), "prizes"));
+        if (snapshot.exists()) {
+          const prizes = snapshot.val();
+          const keys = Object.keys(prizes);
+          const randomKey = keys[Math.floor(Math.random() * keys.length)];
+          const prizeName = randomKey.replace(/-/g, " ");
+          resultText.textContent = `🎉 مبروك! جائزتك هي: ${prizeName}`;
+        } else {
+          resultText.textContent = "لم يتم العثور على جوائز في قاعدة البيانات!";
+        }
+      } catch (error) {
+        resultText.textContent = "حدث خطأ أثناء الاتصال بقاعدة البيانات!";
+        console.error(error);
+      }
+    });
+  </script>
+</body>
+</html>
