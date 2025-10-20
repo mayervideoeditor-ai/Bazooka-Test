@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <meta name="theme-color" content="#0e1117" />
+  <title>عجلة الجوائز | Bazooka</title>
+  <meta name="description" content="لف العجلة واربح هدايا بازوكا — لفة واحدة لكل عميل" />
+</head>
+<body>
+  <h1>🎡 عجلة الجوائز - Bazooka</h1>
+  <p>تجربة ربط Firebase Realtime Database و Anonymous Auth</p>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getDatabase } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    const firebaseConfig = {
+      apiKey: "AIzaSyCSvQmQWJznZ1aC-YBpsbmlcZcbQamzY4",
+      authDomain: "bazooka-95oe9.firebaseapp.com",
+      databaseURL: "https://bazooka-95oe9-default-rtdb.firebaseio.com",
+      projectId: "bazooka-95oe9",
+      storageBucket: "bazooka-95oe9.appspot.com",
+      messagingSenderId: "53284970189",
+      appId: "1:53284970189:web:4e8f3bd1825e2240425384"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+    signInAnonymously(auth)
+      .then(()=>console.log("✅ User signed in anonymously"))
+      .catch(e=>console.error("Auth error:",e));
+  </script>
+</body>
+</html>
