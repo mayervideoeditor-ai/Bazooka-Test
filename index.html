@@ -1,92 +1,224 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bazooka - عجلة الجوائز</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <title>عجلة الجوائز | Bazooka</title>
+  <meta name="description" content="لف العجلة واربح — لفة واحدة لكل عميل" />
   <style>
-    body {
-      font-family: 'Cairo', sans-serif;
-      background: linear-gradient(135deg, #ff4b2b, #ff416c);
-      color: #fff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-      text-align: center;
-    }
-    h1 {
-      font-size: 2.2rem;
-      margin-bottom: 10px;
-    }
-    button {
-      background-color: #fff;
-      color: #ff416c;
-      font-size: 1.2rem;
-      border: none;
-      border-radius: 8px;
-      padding: 10px 25px;
-      cursor: pointer;
-      transition: 0.3s;
-    }
-    button:hover {
-      background-color: #ffefef;
-    }
-    .result {
-      margin-top: 20px;
-      font-size: 1.4rem;
-      font-weight: bold;
-    }
+    :root { --bg:#0e1117; --panel:#171b22; --text:#e7e7e7; --muted:#9aa0a6; --brand:#ff7b00; }
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(1200px 700px at 50% -200px,#ff5f6d,#ffc371 60%,#0e1117 60%);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Kufi Arabic",Tahoma,Arial;min-height:100vh;display:grid;place-items:center;padding:20px}
+    .wrap{max-width:980px;width:100%;display:grid;gap:16px;justify-items:center;text-align:center}
+    h1{margin:.2rem 0 .3rem;font-size:clamp(22px,3.4vw,30px)}
+    p.muted{color:var(--muted);margin:.2rem 0}
+    .stage{position:relative;display:grid;place-items:center;background:var(--panel);padding:18px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    #wheel{width:min(92vw,520px);aspect-ratio:1/1;transition:transform 5s cubic-bezier(.17,.89,.45,1);will-change:transform}
+    .pin{position:absolute;top:10px;left:50%;transform:translateX(-50%);}
+    .pin:before{content:"";display:block;width:0;height:0;border-left:16px solid transparent;border-right:16px solid transparent;border-bottom:28px solid #ffd166;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}
+    button#spin{margin-top:14px;padding:12px 20px;border:none;border-radius:12px;background:var(--brand);color:#111;font-weight:800;cursor:pointer;font-size:1rem}
+    button#spin[disabled]{opacity:.55;cursor:not-allowed}
+    #msg{margin-top:6px;color:var(--muted)}
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:20px}
+    .modal.show{display:flex}
+    .box{background:var(--panel);border-radius:16px;padding:18px 18px 14px;max-width:420px;width:100%;text-align:center}
+    .box img{width:140px;height:140px;object-fit:contain;margin-bottom:8px}
+    .close{margin-top:10px;padding:10px 14px;border:none;border-radius:10px;background:#23d18b;color:#04110a;font-weight:800;cursor:pointer}
+    .footer{font-size:12px;color:var(--muted)}
   </style>
 </head>
 <body>
-  <h1>🎡 Bazooka - عجلة الجوائز</h1>
-  <p>اضغط على الزر لتجربة سحب عشوائي من الجوائز!</p>
-  <button id="spinButton">لف العجلة</button>
-  <div class="result" id="resultText"></div>
+  <div class="wrap">
+    <h1>🎡 عجلة الجوائز</h1>
+    <p class="muted">لفة واحدة فقط لكل عميل — بالتوفيق!</p>
 
-  <!-- Firebase -->
+    <div class="stage">
+      <div class="pin" aria-hidden="true"></div>
+      <svg id="wheel" viewBox="0 0 1000 1000" aria-label="عجلة الجوائز"></svg>
+      <button id="spin">لف العجلة</button>
+      <div id="msg"></div>
+    </div>
+
+    <div class="footer">Bazooka • Firebase Realtime Database</div>
+  </div>
+
+  <!-- نتيجة الفوز -->
+  <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="ttl">
+    <div class="box">
+      <img id="prizeImg" alt="">
+      <h2 id="ttl" style="margin:.2rem 0 .4rem">🎉 مبروك!</h2>
+      <p style="margin:.2rem 0">لقد ربحت <b id="prizeLabel"></b></p>
+      <p style="margin:.2rem 0">كودك: <b id="prizeCode"></b></p>
+      <button class="close" onclick="document.getElementById('modal').classList.remove('show')">تمام ✅</button>
+    </div>
+  </div>
+
+  <!-- Firebase + منطق العجلة -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import { getDatabase, ref, get, runTransaction, set } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
+    // إعدادات مشروعك (زي ما عندك في الكونسول)
     const firebaseConfig = {
-      apiKey: "AIzaSyCSv2mQKWJznZ1aC-YBpsbmlcZcbQamzY4",
-      authDomain: "bazooka-950e9.firebaseapp.com",
-      databaseURL: "https://bazooka-950e9-default-rtdb.firebaseio.com",
-      projectId: "bazooka-950e9",
-      storageBucket: "bazooka-950e9.appspot.com",
+      apiKey: "AIzaSyCSvQmQWJznZ1aC-YBpsbmlcZcbQamzY4",
+      authDomain: "bazooka-95oe9.firebaseapp.com",
+      databaseURL: "https://bazooka-95oe9-default-rtdb.firebaseio.com",
+      projectId: "bazooka-95oe9",
+      storageBucket: "bazooka-95oe9.appspot.com",
       messagingSenderId: "53284970189",
-      appId: "1:53284970189:web:4e8f3bd1825e2240425384",
-      measurementId: "G-CKYK8KFGY2"
+      appId: "1:53284970189:web:4e8f3bd1825e2240425384"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+    const app  = initializeApp(firebaseConfig);
+    const db   = getDatabase(app);
+    const auth = getAuth(app);
 
-    const spinButton = document.getElementById("spinButton");
-    const resultText = document.getElementById("resultText");
+    // UI refs
+    const wheel   = document.getElementById("wheel");
+    const spinBtn = document.getElementById("spin");
+    const msg     = document.getElementById("msg");
+    const modal   = document.getElementById("modal");
+    const prizeLabel = document.getElementById("prizeLabel");
+    const prizeCode  = document.getElementById("prizeCode");
+    const prizeImg   = document.getElementById("prizeImg");
 
-    spinButton.addEventListener("click", async () => {
-      resultText.textContent = "جاري السحب...";
-      try {
-        const snapshot = await get(child(ref(db), "prizes"));
-        if (snapshot.exists()) {
-          const prizes = snapshot.val();
-          const keys = Object.keys(prizes);
-          const randomKey = keys[Math.floor(Math.random() * keys.length)];
-          const prizeName = randomKey.replace(/-/g, " ");
-          resultText.textContent = `🎉 مبروك! جائزتك هي: ${prizeName}`;
-        } else {
-          resultText.textContent = "لم يتم العثور على جوائز في قاعدة البيانات!";
-        }
-      } catch (error) {
-        resultText.textContent = "حدث خطأ أثناء الاتصال بقاعدة البيانات!";
-        console.error(error);
+    let userId = null;
+    let prizes = [];
+    let spinning = false;
+
+    signInAnonymously(auth).catch(console.error);
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+      userId = user.uid;
+
+      // منع اللفة التانية
+      const playedSnap = await get(ref(db, `plays/${userId}`));
+      if (playedSnap.exists()) {
+        spinBtn.disabled = true;
+        msg.textContent = "لقد استخدمت فرصتك بالفعل 🎁";
       }
+
+      await loadPrizes();
     });
+
+    // تحميل الجوائز من RTDB
+    async function loadPrizes() {
+      const snap = await get(ref(db, "prizes"));
+      prizes = [];
+      snap.forEach(ch => {
+        const d = ch.val();
+        if (d && Number(d.qty) > 0) prizes.push({ id: ch.key, ...d });
+      });
+      buildWheel();
+      // تحميل مسبق للصور
+      prizes.forEach(p => { if (p.icon) { const i=new Image(); i.src = p.icon; }});
+    }
+
+    // بناء عجلة SVG بالسلايس والصور
+    function buildWheel(){
+      while (wheel.firstChild) wheel.removeChild(wheel.firstChild);
+      if (!prizes.length) { spinBtn.disabled = true; msg.textContent = "الجوائز انتهت 🎯"; return; }
+
+      const N=prizes.length, seg=360/N, r=480, c=500;
+      const colors=["#ff7b00","#e62e00","#ffb366","#009933","#3399ff","#9933ff","#ffd166","#06d6a0"];
+
+      for(let i=0;i<N;i++){
+        const start=(i*seg-90)*Math.PI/180, end=((i+1)*seg-90)*Math.PI/180;
+        const x1=c+r*Math.cos(start), y1=c+r*Math.sin(start);
+        const x2=c+r*Math.cos(end),   y2=c+r*Math.sin(end);
+
+        const g=document.createElementNS("http://www.w3.org/2000/svg","g");
+        const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+        path.setAttribute("d",`M ${c} ${c} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`);
+        path.setAttribute("fill",colors[i%colors.length]);
+        path.setAttribute("stroke","rgba(0,0,0,.25)");
+        path.setAttribute("stroke-width","2");
+        g.appendChild(path);
+
+        const mid=(i+0.5)*seg-90;
+        const tx=c+(r*0.62)*Math.cos(mid*Math.PI/180);
+        const ty=c+(r*0.62)*Math.sin(mid*Math.PI/180);
+
+        const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+        t.setAttribute("x",tx); t.setAttribute("y",ty);
+        t.setAttribute("fill","#fff"); t.setAttribute("font-size","26");
+        t.setAttribute("font-weight","700");
+        t.setAttribute("text-anchor","middle");
+        t.setAttribute("dominant-baseline","middle");
+        t.setAttribute("transform",`rotate(${mid+90} ${tx} ${ty})`);
+        t.textContent=prizes[i].label;
+        g.appendChild(t);
+
+        if (prizes[i].icon){
+          const ir=r*0.74,size=120;
+          const ix=c+ir*Math.cos(mid*Math.PI/180)-size/2;
+          const iy=c+ir*Math.sin(mid*Math.PI/180)-size/2;
+          const img=document.createElementNS("http://www.w3.org/2000/svg","image");
+          img.setAttributeNS("http://www.w3.org/1999/xlink","href",prizes[i].icon);
+          img.setAttribute("x",ix); img.setAttribute("y",iy);
+          img.setAttribute("width",size); img.setAttribute("height",size);
+          img.setAttribute("preserveAspectRatio","xMidYMid slice");
+          g.appendChild(img);
+        }
+        wheel.appendChild(g);
+      }
+      if (!spinBtn.disabled) msg.textContent = "جاهز للّفة!";
+    }
+
+    // اختيار عشوائي (ممكن لاحقًا نضيف weight حسب الكمية)
+    function pickIndex(){ return Math.floor(Math.random()*prizes.length); }
+
+    // Spin
+    spinBtn.addEventListener("click", async ()=>{
+      if (spinning || !prizes.length || !userId) return;
+
+      const played = await get(ref(db, `plays/${userId}`));
+      if (played.exists()) { msg.textContent="لقد استخدمت فرصتك."; spinBtn.disabled=true; return; }
+
+      spinning = true; spinBtn.disabled = true; msg.textContent = "جاري اللف...";
+      const N=prizes.length, seg=360/N, win=pickIndex();
+      const angle = 6*360 + (360 - (win*seg + seg/2)); // 6 لفات + توجيه للمؤشر
+      wheel.style.transform = `rotate(${angle}deg)`;
+
+      setTimeout(async ()=>{
+        try{
+          const won = await claimOnce(prizes[win]); // يقلل qty ويسجّل play
+          showResult(won);
+          msg.textContent = "انتهت اللفة 🎉";
+          // لو جايزة خلصت تتشال من العجلة
+          setTimeout(loadPrizes, 400);
+        }catch(e){
+          console.error(e);
+          msg.textContent = "عذرًا، الجائزة نفدت أو تم استخدام الفرصة.";
+          const again = await get(ref(db, `plays/${userId}`));
+          if (!again.exists()) spinBtn.disabled = false;
+        }finally{
+          spinning = false;
+        }
+      }, 5000);
+    });
+
+    // Transaction: خصم qty وكتابة plays/uid مرة واحدة
+    async function claimOnce(p){
+      const qtyRef = ref(db, `prizes/${p.id}/qty`);
+      await runTransaction(qtyRef, current=>{
+        if (current === null) return current;
+        if (current <= 0) throw "out_of_stock";
+        return current - 1;
+      });
+      await set(ref(db, `plays/${userId}`), {
+        prizeId: p.id, label: p.label, code: p.code, icon: p.icon || "", at: Date.now()
+      });
+      return p;
+    }
+
+    function showResult(p){
+      prizeLabel.textContent = p.label;
+      prizeCode.textContent  = p.code;
+      prizeImg.src           = p.icon || "";
+      modal.classList.add("show");
+    }
   </script>
 </body>
 </html>
